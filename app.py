@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -40,85 +39,80 @@ SNP_EFFECTS = {
 }
 
 STATUS_COLORS = {
-    "Normal": "#2ecc71",
-    "Intermediate": "#f1c40f",
-    "Poor": "#e74c3c",
-    "Low Risk": "#2ecc71",
-    "Medium Risk": "#f1c40f",
-    "High Risk": "#e74c3c",
-    "Unknown": "#95a5a6"
+    "Normal": "#4CAF50",      # Green
+    "Intermediate": "#FFC107", # Amber
+    "Poor": "#F44336",         # Red
+    "Low Risk": "#4CAF50",
+    "Medium Risk": "#FFC107",
+    "High Risk": "#F44336",
+    "Unknown": "#9E9E9E"       # Grey
 }
 
 MED_RECOMMENDATIONS = {
     "CYP2C19": {
-        "Poor": "Avoid clopidogrel. Consider prasugrel or ticagrelor.",
-        "Intermediate": "Use caution with clopidogrel; consider monitoring or alternative.",
+        "Poor": "Avoid **clopidogrel**. Consider prasugrel or ticagrelor.",
+        "Intermediate": "Use caution with **clopidogrel**; consider monitoring or alternative.",
         "Normal": "Standard dosing acceptable."
     },
     "APOE": {
-        "High Risk": "Assess cognitive risk; consider specialist referral.",
-        "Medium Risk": "Lifestyle modification and monitoring.",
+        "High Risk": "Assess cognitive risk; consider **specialist referral**.",
+        "Medium Risk": "Lifestyle modification and **monitoring**.",
         "Low Risk": "Routine care."
     }
 }
 
 EMERGENCY_STATUS_COLORS = {
-    "Critical": "#ff4444",
-    "Warning": "#ffbb33",
-    "Normal": "#00C851"
+    "Critical": "#F44336", # Red
+    "Warning": "#FF9800",  # Orange
+    "Normal": "#4CAF50"    # Green
 }
 
 # ----------------------------
 # --- Page & Theme Setup ---
 # ----------------------------
-st.set_page_config(page_title="MetaTele AI — TeleGeno Dashboard", layout="wide", initial_sidebar_state="expanded")
-# header image path from uploaded developer asset; if missing, header will show title only
-HEADER_IMAGE_PATH = "/mnt/data/afa34478-4816-428b-ab5a-f837ff66e2c8.png"
+# Set page config for a general light theme look (Streamlit default)
+st.set_page_config(page_title="TeleGeno AI — Patient Dashboard", layout="wide", initial_sidebar_state="expanded")
+# Note: HEADER_IMAGE_PATH is likely invalid in the execution environment, so we'll rely on the title.
 
-# dark theme injection for sleek look
-def _inject_css(dark=True):
+# Light theme injection for sleek look
+def _inject_css(light=True):
+    # This CSS overrides Streamlit defaults to achieve a cleaner, lighter look
     base = """
     <style>
-      .stApp, .block-container { background-color:#080808 !important; color:#e8e8e8 !important; }
-      .sidebar .block-container { background-color:#0b0b0b !important; color:#e8e8e8 !important; }
-      .patient-capsule { display:inline-block; padding:8px 16px; border-radius:999px; background:#111; color:#fff; font-weight:700; border:1px solid #222; }
-      .card { background:#0b0b0b; padding:14px; border-radius:12px; border:1px solid #1a1a1a; }
-      .small-metric { font-size:22px; font-weight:700; }
-      .muted { color:#a6a6a6; font-size:13px; }
-      .plotly-graph-div .modebar-btn { background: #111 !important; }
-      .header-logo { height:48px; object-fit:contain; border-radius:6px; }
+      /* Main App Background - Slightly off-white */
+      .stApp { background-color:#F5F5F5; }
+      /* Sidebar Background - White */
+      .stSidebar { background-color:#FFFFFF; border-right: 1px solid #EEEEEE; }
+      /* Main Content Containers */
+      .block-container { color:#333333; }
+      
+      /* Card Styling - White with a subtle shadow/border */
+      .card { background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #DDDDDD; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+      
+      /* Typography */
+      h1, h2, h3, h4, .small-metric { color:#333333; }
+      .small-metric { font-size:24px; font-weight:700; }
+      .muted { color:#757575; font-size:13px; }
+      
+      /* Sidebar specific styles */
+      .sidebar .stRadio > label { font-weight: 500; }
+      
+      /* Custom Elements */
+      .patient-capsule { display:inline-block; padding:8px 16px; border-radius:999px; background:#BBDEFB; color:#1565C0; font-weight:700; border:1px solid #90CAF9; }
+      
+      /* Adjust Plotly to blend with light theme */
+      .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
+    
+      /* Medication Guidance Cards */
+      .med-card-content { color: #333333 !important; }
     </style>
     """
     st.markdown(base, unsafe_allow_html=True)
 
-_inject_css()
+_inject_css(light=True)
 
 # ----------------------------
-# --- Sidebar: inputs ---
-# ----------------------------
-st.sidebar.markdown("### TeleGeno AI — Inputs & Controls")
-patient_name = st.sidebar.text_input("Patient Name", value="John Doe")
-input_type = st.sidebar.radio("Input Type", ["JSON SNP Input", "Simulated VCF", "Demographics + History (AI)"])
-st.sidebar.markdown("---")
-emergency_tab = st.sidebar.checkbox("Enable Emergency (Webcam)")
-
-sample_json = '{"rs4244285": "AA", "rs429358": "AG"}'
-sample_vcf = """##fileformat=VCFv4.2
-#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO
-1\t12345\trs4244285\tA\tG\t.\t.\t.
-1\t67890\trs429358\tC\tT\t.\t.\t."""
-
-with st.sidebar.expander("Sample JSON"):
-    st.code(sample_json)
-with st.sidebar.expander("Sample VCF (sim)"):
-    st.code(sample_vcf)
-
-st.sidebar.markdown("---")
-if st.sidebar.button("Simulate random patient SNPs"):
-    st.session_state["_simulate_snps"] = True
-
-# ----------------------------
-# --- Helper Functions ---
+# --- Helper Functions (No changes in logic) ---
 # ----------------------------
 @st.cache_data
 def parse_json_input(json_data: str):
@@ -189,37 +183,160 @@ def infer_metabolizer_from_genotypes(results_list):
 # A small function to compute a population-style aggregated metric (for demo)
 def metrics_from_results(status):
     total = 1  # single patient demo; in real app this would be dataset length
-    critical_pct = 0
+    # Based on the worst status for the single patient (e.g., if APOE is High Risk)
+    critical_pct = 100 if any(s in status.values() for s in ["Poor", "High Risk"]) else 0
     avg_hr = random.randint(60, 95)
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
     return total, critical_pct, avg_hr, avg_bp
+
+# ----------------------------
+# --- Sidebar: inputs ---
+# ----------------------------
+st.sidebar.markdown("## 🧬 TeleGeno AI — Patient Inputs")
+patient_name = st.sidebar.text_input("Patient Name", value="Ferdoun S.")
+
+# Emergency Checkbox Control
+emergency_tab = st.sidebar.checkbox("🚨 Enable Emergency Assessment")
+st.sidebar.markdown("---")
+
+# Only show PGx inputs if Emergency is NOT enabled
+if not emergency_tab:
+    st.sidebar.markdown("### Genomic Data Input Method")
+    input_type = st.sidebar.radio("Select Input Type", 
+                                  ["JSON SNP Input", "Simulated VCF", "Demographics + History (AI)"], 
+                                  key="_input_type")
+    st.sidebar.markdown("---")
+    
+    # Logic to simulate random SNPs
+    if st.sidebar.button("Simulate random patient SNPs"):
+        st.session_state["_simulate_snps"] = True
+
+    sample_json = '{"rs4244285": "AA", "rs429358": "AG"}'
+    sample_vcf = """##fileformat=VCFv4.2
+#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO
+1\t12345\trs4244285\tA\tG\t.\t.\t.
+1\t67890\trs429358\tC\tT\t.\t.\t."""
+
+    with st.sidebar.expander("Sample JSON"):
+        st.code(sample_json)
+    with st.sidebar.expander("Sample VCF (sim)"):
+        st.code(sample_vcf)
 
 # ----------------------------
 # --- Header ---
 # ----------------------------
 header_col1, header_col2 = st.columns([8,2])
 with header_col1:
-    # show logo if available
-    try:
-        st.image(HEADER_IMAGE_PATH, width=160, caption=None, output_format="auto")
-    except Exception:
-        st.markdown("<h1 style='margin:0;color:#fff'>MetaTele AI — TeleGeno Dashboard</h1>", unsafe_allow_html=True)
-    st.markdown("<div class='muted'>Pharmacogenomic analysis • Emergency webcam triage • Explainable medication guidance</div>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin:0;color:#333'>TeleGeno AI — Patient Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='muted'>Pharmacogenomic analysis • Explainable medication guidance • Emergency triage</div>", unsafe_allow_html=True)
 with header_col2:
     st.markdown(f"<div style='text-align:right'><div class='patient-capsule'>{patient_name}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # ----------------------------
+# --- Emergency Screen Takeover ---
+# ----------------------------
+if emergency_tab:
+    # Use the entire screen for emergency
+    st.markdown("## 🚨 Live Emergency Triage", unsafe_allow_html=True)
+    
+    # Use two-columns for better layout on the full page
+    e_col1, e_col2 = st.columns([2, 1])
+
+    with e_col1:
+        if not _HAS_CV2:
+            st.error("OpenCV not installed: Webcam emergency features are disabled. Install `opencv-python` to enable.")
+            st.button("Generate Simulated Vitals & Report")
+        else:
+            st.markdown("### Step 1: Capture Patient Vitals via Webcam")
+            cam = st.camera_input("Capture patient photo for simulated vitals check")
+            
+            if cam:
+                bytes_data = cam.getvalue()
+                img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+                # mock vitals extraction
+                vitals = {
+                    "hr": random.randint(60,120),
+                    "bp_sys": random.randint(100,170),
+                    "bp_dia": random.randint(60,110)
+                }
+                
+                # quick emergency summary
+                status_overall = "Normal"
+                if vitals['hr']>130 or vitals['bp_sys']>180:
+                    status_overall = "Critical"
+                elif vitals['hr']>100 or vitals['bp_sys']>140:
+                    status_overall = "Warning"
+                
+                st.markdown("---")
+                st.markdown("### Step 2: Vitals & Triage Summary")
+                
+                v1, v2, v3 = st.columns(3)
+                v1.metric("Heart Rate", f"**{vitals['hr']}** bpm", delta_color="normal")
+                v2.metric("Blood Pressure", f"**{vitals['bp_sys']}/{vitals['bp_dia']}** mmHg", delta_color="off")
+                
+                color = EMERGENCY_STATUS_COLORS.get(status_overall, "#9E9E9E")
+                v3.markdown(f"<div class='card' style='background-color: {color}; color: white;'>"
+                            f"<strong style='font-size: 20px;'>{status_overall.upper()}</strong>"
+                            f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
+                            f"</div>", unsafe_allow_html=True)
+                
+                # Report generation (assuming current results from session state if available)
+                report = f"Emergency Report - {patient_name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                report += f"Triage Status: {status_overall}\n"
+                report += f"HR: {vitals['hr']} bpm\nBP: {vitals['bp_sys']}/{vitals['bp_dia']} mmHg\n"
+                
+                # Add PGx info if available
+                current_results = st.session_state.get('pgx_results_list', [])
+                current_status = st.session_state.get('pgx_status', {})
+                if current_status:
+                    metabolizer = infer_metabolizer_from_genotypes(current_results)
+                    report += f"Metabolizer Status (CYP2C19): {metabolizer}\n"
+                    for gene, rec in recommend_meds(current_status).items():
+                        report += f"PGx Guidance ({gene}): {rec}\n"
+                
+                st.markdown("### Step 3: Finalize Report")
+                st.info("Based on the vitals, immediate action may be required. Review PGx guidance if available.")
+                st.download_button(
+                    "Download Emergency Report", 
+                    report, 
+                    file_name=f"emergency_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                )
+            else:
+                st.info("Awaiting webcam input to perform live triage...")
+    
+    with e_col2:
+        st.markdown("### Quick Guide")
+        st.markdown(
+            """
+            * **CRITICAL (Red):** Immediate medical intervention needed.
+            * **WARNING (Orange):** Close monitoring and specialist consult advised.
+            * **NORMAL (Green):** Stable condition.
+            
+            This screen prioritizes **vitals-based assessment** before full PGx review.
+            """
+        )
+
+    st.markdown("---")
+    st.warning("Deactivate 'Enable Emergency Assessment' in the sidebar to return to the main dashboard.")
+    return # EXIT early from the main dashboard rendering
+
+
+# ----------------------------
+# --- Main Dashboard (Not Emergency) ---
+# ----------------------------
+
+# ----------------------------
 # --- Top Metric Cards ---
 # ----------------------------
-total, critical_pct, avg_hr, avg_bp = metrics_from_results({})
+total, critical_pct, avg_hr, avg_bp = metrics_from_results(st.session_state.get('pgx_status', {}))
 
 mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-mcol1.markdown(f"<div class='card'><div class='small-metric'>{total}</div><div class='muted'>Total Patients</div></div>", unsafe_allow_html=True)
-mcol2.markdown(f"<div class='card'><div class='small-metric'>{critical_pct}%</div><div class='muted'>Critical Now</div></div>", unsafe_allow_html=True)
-mcol3.markdown(f"<div class='card'><div class='small-metric'>{avg_hr} bpm</div><div class='muted'>Avg Heart Rate</div></div>", unsafe_allow_html=True)
-mcol4.markdown(f"<div class='card'><div class='small-metric'>{avg_bp}</div><div class='muted'>Avg Blood Pressure</div></div>", unsafe_allow_html=True)
+mcol1.markdown(f"<div class='card'><div class='muted'>Total Patients</div><div class='small-metric'>{total}</div></div>", unsafe_allow_html=True)
+mcol2.markdown(f"<div class='card' style='border-left: 5px solid {EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#EEEEEE'};'><div class='muted'>Critical PGx Flag</div><div class='small-metric' style='color:{EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#4CAF50'}'>{critical_pct}%</div></div>", unsafe_allow_html=True)
+mcol3.markdown(f"<div class='card'><div class='muted'>Avg Heart Rate (Pop)</div><div class='small-metric'>{avg_hr} bpm</div></div>", unsafe_allow_html=True)
+mcol4.markdown(f"<div class='card'><div class='muted'>Avg Blood Pressure (Pop)</div><div class='small-metric'>{avg_bp}</div></div>", unsafe_allow_html=True)
 
 st.markdown("")
 
@@ -230,6 +347,8 @@ left_col, right_col = st.columns([3,1])
 
 # ---------- LEFT: charts & analysis ----------
 with left_col:
+    st.markdown("## 🔬 PGx Analysis & Visualization", unsafe_allow_html=True)
+    
     # Input flows + analysis
     snps_input = {}
     results = []
@@ -240,165 +359,192 @@ with left_col:
         snps_input = {snp: random.choice(["AA", "AG", "GG"]) for snp in all_snps}
         results, status = analyze_snps(snps_input)
         st.session_state["_simulate_snps"] = False
-
-    st.markdown("## Inputs & PGx Analysis", unsafe_allow_html=True)
-    if input_type == "Demographics + History (AI)":
-        with st.form("demo_form"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                age = st.number_input("Age", 0, 120, 55)
-                weight = st.number_input("Weight (kg)", 20, 200, 70)
-                smoking = st.checkbox("Smoking")
-            with c2:
-                family_history = st.checkbox("Family history")
-                temp = st.number_input("Temperature (°C)", 34.0, 42.0, 36.6, step=0.1)
-                bp_sys = st.number_input("Systolic BP", 80, 220, 120)
-            with c3:
-                bp_dia = st.number_input("Diastolic BP", 40, 140, 80)
+        st.session_state["pgx_results_list"] = results # Save to session state
+        st.session_state["pgx_status"] = status
+    
+    # Check session state for existing data
+    if "pgx_results_list" in st.session_state and not st.session_state["pgx_results_list"]:
+        # Only process input if no data is present OR the input type is the demographics AI
+        
+        # --- Input Section ---
+        st.markdown("### 📥 Load Patient Genomic Data")
+        if st.session_state.get("_input_type") == "Demographics + History (AI)":
+            with st.form("demo_form", clear_on_submit=False):
+                st.markdown("Fill out demographics for **AI risk prediction** (simulated PGx inference).")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    age = st.number_input("Age", 0, 120, 55)
+                    weight = st.number_input("Weight (kg)", 20, 200, 70)
+                    smoking = st.checkbox("Smoking")
+                with c2:
+                    family_history = st.checkbox("Family history")
+                    temp = st.number_input("Temperature (°C)", 34.0, 42.0, 36.6, step=0.1)
+                    bp_sys = st.number_input("Systolic BP", 80, 220, 120)
+                with c3:
+                    bp_dia = st.number_input("Diastolic BP", 40, 140, 80)
                 submitted = st.form_submit_button("Run AI Prediction")
-            if submitted:
-                ai_score = random.uniform(0.02, 0.95)
-                metabolizer_pred = "Poor" if ai_score>0.7 else ("Intermediate" if ai_score>0.4 else "Normal")
-                st.success(f"AI Risk Score: {ai_score:.2%} — Predicted metabolizer: {metabolizer_pred}")
-                # create demo results summary
-                results = [{"Gene":"CYP2C19","SNP ID":"rs4244285","Genotype":"AA","Effect":metabolizer_pred}]
-                status = {"CYP2C19":metabolizer_pred}
-    elif input_type == "JSON SNP Input":
-        st.markdown("Paste JSON SNP object (e.g. {\"rs4244285\":\"AA\"})")
-        json_data = st.text_area("JSON SNP input", value=sample_json, height=120)
-        if st.button("Analyze JSON"):
-            parsed = parse_json_input(json_data)
-            if parsed:
-                snps_input = parsed
-                results, status = analyze_snps(snps_input)
-                st.success("JSON parsed and analyzed.")
-            else:
-                st.error("Invalid JSON.")
-    else:
-        uploaded_file = st.file_uploader("Upload VCF-like file", type=['vcf','txt'])
-        colA, colB = st.columns([1,3])
-        with colA:
-            if st.button("Simulate example VCF"):
-                snps_input = parse_vcf_simulator(sample_vcf)
-                results, status = analyze_snps(snps_input)
-                st.success("Simulated VCF parsed.")
-        with colB:
-            if uploaded_file:
-                content = uploaded_file.getvalue().decode(errors="ignore")
-                snps_input = parse_vcf_simulator(content)
-                results, status = analyze_snps(snps_input)
-                st.success("Uploaded VCF parsed (simulated).")
-
+                if submitted:
+                    ai_score = random.uniform(0.02, 0.95)
+                    metabolizer_pred = "Poor" if ai_score>0.7 else ("Intermediate" if ai_score>0.4 else "Normal")
+                    st.success(f"AI Risk Score: **{ai_score:.2%}** — Predicted metabolizer: **{metabolizer_pred}**")
+                    # create demo results summary
+                    results = [{"Gene":"CYP2C19","SNP ID":"rs4244285","Genotype":"AA","Effect":metabolizer_pred}]
+                    status = {"CYP2C19":metabolizer_pred}
+                    st.session_state["pgx_results_list"] = results 
+                    st.session_state["pgx_status"] = status
+                    st.rerun() # Rerun to refresh dashboard metrics immediately
+        
+        elif st.session_state.get("_input_type") == "JSON SNP Input":
+            st.markdown("Paste JSON SNP object (e.g. `{\"rs4244285\":\"AA\"}`) in the text area.")
+            json_data = st.text_area("JSON SNP input", value=sample_json, height=120)
+            if st.button("Analyze JSON"):
+                parsed = parse_json_input(json_data)
+                if parsed:
+                    snps_input = parsed
+                    results, status = analyze_snps(snps_input)
+                    st.session_state["pgx_results_list"] = results 
+                    st.session_state["pgx_status"] = status
+                    st.success("JSON parsed and analyzed.")
+                    st.rerun()
+                else:
+                    st.error("Invalid JSON.")
+        
+        else: # Simulated VCF
+            uploaded_file = st.file_uploader("Upload VCF-like file (Simulated Parsing)", type=['vcf','txt'])
+            colA, colB = st.columns([1,3])
+            with colA:
+                if st.button("Simulate example VCF"):
+                    snps_input = parse_vcf_simulator(sample_vcf)
+                    results, status = analyze_snps(snps_input)
+                    st.session_state["pgx_results_list"] = results 
+                    st.session_state["pgx_status"] = status
+                    st.success("Simulated VCF parsed.")
+                    st.rerun()
+            with colB:
+                if uploaded_file:
+                    content = uploaded_file.getvalue().decode(errors="ignore")
+                    snps_input = parse_vcf_simulator(content)
+                    results, status = analyze_snps(snps_input)
+                    st.session_state["pgx_results_list"] = results 
+                    st.session_state["pgx_status"] = status
+                    st.success("Uploaded VCF parsed (simulated).")
+                    st.rerun()
+    
+    # Retrieve current results from session state
+    results = st.session_state.get('pgx_results_list', [])
+    status = st.session_state.get('pgx_status', {})
+    
     # Display PGx results
-    st.markdown("### Pharmacogenomic Summary")
+    st.markdown("### SNP Genotype and Effect Table")
     df = results_to_df(results)
     if df.empty:
-        st.info("No SNP results to display. Use an input method or simulate.")
+        st.info("No SNP results to display. Please use an input method from the sidebar or click 'Simulate random patient SNPs'.")
     else:
-        st.dataframe(df, use_container_width=True, height=220)
-        # plots
-        plot_template = "plotly_dark"
+        # st.dataframe(df, use_container_width=True, height=220)
+        st.table(df) # Use table for cleaner look with smaller data
+        
+        # --- Visualizations ---
+        st.markdown("---")
+        st.markdown("### Visual Insights: Genotypes & Potential Effects")
+        plot_template = "plotly_white" # Change to white for light theme
+        
         c1, c2 = st.columns(2)
         with c1:
+            # Genotype Bar Chart
             gen_counts = df["Genotype"].value_counts().reset_index()
             gen_counts.columns = ["Genotype", "Count"]
-            fig1 = px.bar(gen_counts, x="Genotype", y="Count", title="Genotype Counts", template=plot_template)
-            fig1.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig1 = px.bar(gen_counts, x="Genotype", y="Count", title="Count of Observed Genotypes", template=plot_template, 
+                          color_discrete_sequence=["#2979FF"]) # Blue
+            fig1.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", title_font_size=14)
             st.plotly_chart(fig1, use_container_width=True)
+            st.caption("Interpretation: Visualizing the frequency of homozygous (e.g., AA) vs. heterozygous (e.g., AG) genotypes.")
+            
         with c2:
+            # Effect Pie Chart
             eff_counts = df["Effect"].value_counts().reset_index()
             eff_counts.columns = ["Effect", "Count"]
-            fig2 = px.pie(eff_counts, names="Effect", values="Count", title="Effect Distribution",
+            fig2 = px.pie(eff_counts, names="Effect", values="Count", title="Distribution of Predicted PGx Effects",
+                          color="Effect",
                           color_discrete_map=STATUS_COLORS, template=plot_template)
-            fig2.update_layout(paper_bgcolor="rgba(0,0,0,0)")
+            fig2.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=1)))
+            fig2.update_layout(paper_bgcolor="#FFFFFF", title_font_size=14)
             st.plotly_chart(fig2, use_container_width=True)
-
-        # treemap
+            st.caption("Interpretation: A critical view on the most significant effects (Poor/High Risk) influencing drug metabolism and disease risk.")
+            
+        # Treemap
         treemap_df = df.groupby(["Gene","Effect"]).size().reset_index(name="count")
-        fig3 = px.treemap(treemap_df, path=["Gene","Effect"], values="count", title="Gene → Effect Treemap", template=plot_template)
-        fig3.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig3, use_container_width=True, height=420)
-
-        # medication recommendations
-        st.markdown("#### Medication Guidance")
+        fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
+                          template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
+        fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10))
+        st.plotly_chart(fig3, use_container_width=True, height=350)
+        st.caption("Interpretation: Shows which genes (CYP2C19/APOE) are associated with the most concerning effects. Larger blocks indicate more SNPs contributing to that effect.")
+        
+        st.markdown("---")
+        # Medication recommendations
+        st.markdown("### 💊 Explainable Medication Guidance")
         meds = recommend_meds(status)
         cols = st.columns(len(meds))
         for i, (gene, rec) in enumerate(meds.items()):
-            bg = STATUS_COLORS.get(status.get(gene, "Unknown"), "#95a5a6")
-            cols[i].markdown(f"<div style='padding:10px;border-radius:8px;background:{bg};color:#000'>"
-                             f"<strong>{gene}</strong><br/><small>Status: {status.get(gene,'Unknown')}</small><hr style='opacity:0.6'>{rec}</div>", unsafe_allow_html=True)
+            bg = STATUS_COLORS.get(status.get(gene, "Unknown"), "#9E9E9E")
+            text_color = "white" if bg in ["#F44336", "#1976D2"] else "#333333" # Ensure contrast
+            cols[i].markdown(
+                f"<div class='card' style='background:{bg};color:{text_color}'>"
+                f"<strong>{gene}</strong>: <span style='font-size:14px;'>{status.get(gene,'Unknown')} Status</span>"
+                f"<hr style='border-top: 1px solid rgba(255,255,255,0.6); margin:8px 0;'> "
+                f"<div class='med-card-content' style='color: {text_color} !important;'>{rec}</div>"
+                f"</div>", 
+                unsafe_allow_html=True
+            )
 
+        st.markdown("---")
         csv = df.to_csv(index=False)
-        st.download_button("Download PGx results (CSV)", csv, file_name="pgx_results.csv", mime="text/csv")
+        st.download_button("Download PGx results (CSV)", csv, file_name=f"pgx_results_{patient_name.replace(' ', '_')}.csv", mime="text/csv")
 
-# ---------- RIGHT: patient card, emergency, quick actions ----------
+
+# ---------- RIGHT: patient card, quick actions ----------
 with right_col:
-    st.markdown("## Patient Card")
+    st.markdown("## 👤 Patient Snapshot")
+    
+    # Check if there are results to display
+    metabolizer_status = infer_metabolizer_from_genotypes(st.session_state.get('pgx_results_list', []))
+    
     card_html = f"""
-    <div class='card'>
+    <div class='card' style='padding:20px;'>
       <div style='display:flex;gap:12px;align-items:center'>
-        <div style='width:72px;height:72px;border-radius:10px;background:#111;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px'>{patient_name[:1].upper()}</div>
+        <div style='width:64px;height:64px;border-radius:50%;background:#E3F2FD;border:2px solid #BBDEFB;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px;color:#1565C0'>{patient_name[:1].upper()}</div>
         <div>
-          <div style='font-weight:700;font-size:16px'>{patient_name}</div>
-          <div class='muted'>Last seen: {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
+          <div style='font-weight:700;font-size:18px'>{patient_name}</div>
+          <div class='muted'>Last PGx Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
         </div>
       </div>
-      <hr style='opacity:0.08;margin:12px 0'/>
-      <div style='display:flex;gap:8px;flex-wrap:wrap'>
-        <div style='padding:8px;border-radius:8px;background:#0f0f0f;min-width:120px'><strong>Metabolizer</strong><div style='color:#ffd36b'>{infer_metabolizer_from_genotypes(results)}</div></div>
-        <div style='padding:8px;border-radius:8px;background:#0f0f0f;min-width:120px'><strong>Risk Score</strong><div style='color:#9fe7a4'>{random.uniform(0.05,0.95):.1%}</div></div>
-        <div style='padding:8px;border-radius:8px;background:#0f0f0f;min-width:120px'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
+      <hr style='opacity:0.2;margin:15px 0'/>
+      <div style='display:grid;grid-template-columns: 1fr 1fr; gap:10px;text-align:center;'>
+        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Metabolizer</strong><div style='color:{STATUS_COLORS.get(metabolizer_status, '#9E9E9E')}; font-weight:700;'>{metabolizer_status}</div></div>
+        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Risk Score</strong><div style='color:#00BCD4; font-weight:700;'>{random.uniform(0.05,0.95):.1%}</div></div>
+        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
+        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Prescriber</strong><div class='muted'>Dr. A. Khan</div></div>
       </div>
-      <hr style='opacity:0.08;margin:12px 0'/>
-      <div style='display:flex;gap:8px'>
-        <form action="#">
-        </form>
-        <a><button style='padding:8px 10px;border-radius:8px;background:#111;color:#fff;border:1px solid #222'>📄 Patient Summary</button></a>
-        <a><button style='padding:8px 10px;border-radius:8px;background:#0b7dda;color:#fff;border:1px solid #066ca0'>🔁 Re-run</button></a>
+      <hr style='opacity:0.2;margin:15px 0'/>
+      <div style='display:flex;gap:10px;flex-direction:column;'>
+        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#03A9F4;color:#fff;border:none;font-weight:600;cursor:pointer;'>📄 Generate Comprehensive Report</button></a>
+        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;'>🔁 Reset & New Run</button></a>
       </div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-    st.markdown("### Emergency Assessment")
-    if emergency_tab:
-        if not _HAS_CV2:
-            st.warning("OpenCV not installed — webcam emergency features require opencv-python. Continue without webcam.")
-            st.button("Generate simulated emergency report")
-        else:
-            cam = st.camera_input("Capture patient photo")
-            if cam:
-                bytes_data = cam.getvalue()
-                img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
-                # mock vitals extraction
-                vitals = {
-                    "hr": random.randint(60,120),
-                    "bp_sys": random.randint(100,170),
-                    "bp_dia": random.randint(60,110)
-                }
-                st.metric("Heart Rate", f"{vitals['hr']} bpm")
-                st.metric("Blood Pressure", f"{vitals['bp_sys']}/{vitals['bp_dia']} mmHg")
-                # quick emergency summary
-                status_overall = "Normal"
-                if vitals['hr']>130 or vitals['bp_sys']>180:
-                    status_overall = "Critical"
-                elif vitals['hr']>100 or vitals['bp_sys']>140:
-                    status_overall = "Warning"
-                color = EMERGENCY_STATUS_COLORS.get(status_overall, "#95a5a6")
-                st.markdown(f"<div class='card'><strong style='color:{color}'>{status_overall}</strong><p class='muted'>Automated emergency triage (simulated)</p></div>", unsafe_allow_html=True)
-                # allow download of short report
-                report = f"Emergency Report - {patient_name}\nTime: {datetime.now()}\nHR: {vitals['hr']} bpm\nBP: {vitals['bp_sys']}/{vitals['bp_dia']}\nMetabolizer: {infer_metabolizer_from_genotypes(results)}\nNotes: Simulated"
-                st.download_button("Download Emergency Report", report, file_name=f"emergency_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
-    else:
-        st.info("Enable Emergency mode from sidebar to use webcam triage (optional).")
-
     st.markdown("---")
-    st.markdown("### Quick actions")
-    st.button("Export patient JSON")
-    st.button("Export anonymized PGx report")
+    st.markdown("### Quick Actions")
+    if st.button("Export patient JSON"):
+        # Add logic to serialize and download patient data
+        st.success("Patient JSON data exported (simulated).")
+    
+    if st.button("Export anonymized PGx report"):
+        # Add logic to generate and download anonymized report
+        st.success("Anonymized PGx report generated (simulated).")
 
 # ----------------------------
 # --- Footer / Notes ---
 # ----------------------------
 st.markdown("---")
-st.markdown("<div class='muted'>Simulation dashboard for demo and development. Not for clinical use.</div>", unsafe_allow_html=True)
+st.markdown("<div class='muted' style='text-align:center; padding:10px;'>TeleGeno AI Dashboard — Simulation for demonstration purposes. Not for clinical use.</div>", unsafe_allow_html=True)
