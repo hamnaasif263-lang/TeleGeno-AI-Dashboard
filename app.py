@@ -320,7 +320,7 @@ if emergency_tab:
 
     st.markdown("---")
     st.warning("Deactivate 'Enable Emergency Assessment' in the sidebar to return to the main dashboard.")
-    return # EXIT early from the main dashboard rendering
+    return st.stop() # Stops execution of the rest of the main dashboard when emergency is active
 
 
 # ----------------------------
