@@ -73,13 +73,10 @@ MEDICAL_HISTORY_OPTIONS = ['Hypertension', 'Cholesterol', 'Diabetes', 'Thyroid D
 # ----------------------------
 # --- Page & Theme Setup ---
 # ----------------------------
-# Set page config for a general light theme look (Streamlit default)
 st.set_page_config(page_title="TeleGeno AI — Patient Dashboard", layout="wide", initial_sidebar_state="expanded")
-# Note: HEADER_IMAGE_PATH is likely invalid in the execution environment, so we'll rely on the title.
 
 # Light theme injection for sleek look
 def _inject_css(light=True):
-    # This CSS overrides Streamlit defaults to achieve a cleaner, lighter look
     base = """
     <style>
       /* Main App Background - Slightly off-white */
@@ -194,6 +191,14 @@ def metrics_from_results(status):
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
     return total, critical_pct, avg_hr, avg_bp
 
+# Function to reset dashboard state
+def reset_dashboard():
+    st.session_state['pgx_results_list'] = []
+    st.session_state['pgx_status'] = {}
+    st.success("Dashboard state cleared!")
+    time.sleep(0.5)
+    st.rerun()
+
 # ----------------------------
 # --- Sidebar: inputs ---
 # ----------------------------
@@ -248,7 +253,7 @@ with header_col2:
 st.markdown("---")
 
 # ----------------------------
-# --- Emergency Screen Takeover ---
+# --- Emergency Screen Takeover (Updated to show Metabolizer Status) ---
 # ----------------------------
 if emergency_tab:
     # Use the entire screen for emergency
@@ -286,18 +291,30 @@ if emergency_tab:
             st.markdown("---")
             st.markdown("### Step 2: Vitals & Triage Summary")
             
-            v1, v2, v3 = st.columns(3)
-            v1.metric("Heart Rate", f"**{vitals['hr']}** bpm", delta_color="normal")
-            v2.metric("Blood Pressure", f"**{vitals['bp_sys']}/{vitals['bp_dia']}** mmHg", delta_color="off")
+            # --- FETCH & DISPLAY METABOLIZER STATUS ---
+            current_results = st.session_state.get('pgx_results_list', [])
+            metabolizer_status = infer_metabolizer_from_genotypes(current_results)
             
-            color = EMERGENCY_STATUS_COLORS.get(status_overall, "#9E9E9E")
-            v3.markdown(f"<div class='card' style='background-color: {color}; color: white;'>"
-                        f"<strong style='font-size: 20px;'>{status_overall.upper()}</strong>"
-                        f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
+            v1, v2, v3 = st.columns(3)
+            
+            # Metabolizer Status (Primary PGx warning)
+            v1.markdown(f"<div class='card' style='padding:10px; background:#f0f0f0; border-left: 5px solid {STATUS_COLORS.get(metabolizer_status, '#9E9E9E')};'>"
+                        f"<strong>PGx Metabolizer:</strong><br/>"
+                        f"<span style='font-size: 16px; color:#1565C0;'>{metabolizer_status}</span>"
                         f"</div>", unsafe_allow_html=True)
             
+            # Vitals
+            v2.metric("Heart Rate", f"**{vitals['hr']}** bpm", delta_color="normal")
+            
+            # Triage Status
+            color = EMERGENCY_STATUS_COLORS.get(status_overall, "#9E9E9E")
+            v3.markdown(f"<div class='card' style='background-color: {color}; color: white; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; margin: 0; padding: 5px;'>"
+                        f"<strong>{status_overall.upper()}</strong>"
+                        f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
+                        f"</div>", unsafe_allow_html=True)
+
+            
             # Report generation (assuming current results from session state if available)
-            current_results = st.session_state.get('pgx_results_list', [])
             current_status = st.session_state.get('pgx_status', {})
             
             report = f"Emergency Report - {patient_name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -305,8 +322,7 @@ if emergency_tab:
             report += f"HR: {vitals['hr']} bpm\nBP: {vitals['bp_sys']}/{vitals['bp_dia']} mmHg\n"
             
             if current_status:
-                metabolizer = infer_metabolizer_from_genotypes(current_results)
-                report += f"Metabolizer Status (CYP2C19): {metabolizer}\n"
+                report += f"Metabolizer Status (CYP2C19): {metabolizer_status}\n"
                 for gene, rec in recommend_meds(current_status).items():
                     report += f"PGx Guidance ({gene}): {rec}\n"
             
@@ -383,7 +399,7 @@ with left_col:
     current_input_type = st.session_state.get("_input_type")
     
     # ----------------------------------------------------
-    # A. Demographics + History (AI) Input
+    # A. Demographics + History (AI) Input (Updated Logic)
     # ----------------------------------------------------
     if current_input_type == "Demographics + History (AI)":
         st.markdown("Fill out demographics and history for **AI risk prediction** (simulated PGx inference).")
@@ -412,34 +428,42 @@ with left_col:
             submitted = st.form_submit_button("Run AI Prediction")
             
             if submitted:
-                # --- Simulated AI Logic ---
-                # A simple weighted logic to simulate the AI prediction based on inputs
-                ai_score = 0.05 
-                if 'Hypertension' in medical_history or bp_sys > 140: ai_score += 0.2
-                if 'Diabetes' in medical_history: ai_score += 0.3
-                if 'Cardiovascular Disease' in medical_history: ai_score += 0.4
-                if age > 60: ai_score += 0.15
-                if smoking: ai_score += 0.2
+                # --- ENHANCED SIMULATED AI LOGIC ---
                 
-                ai_score = min(ai_score, 0.99) # Cap score
+                # BASE RISK: Higher BP/Age
+                ai_score = 0.05 + (age / 120) * 0.15 + (bp_sys / 220) * 0.10
                 
-                if ai_score > 0.7: metabolizer_pred = "Poor"
-                elif ai_score > 0.4: metabolizer_pred = "Intermediate"
+                # CYP2C19 (Metabolizer) Prediction Logic: Influenced by age and smoking/cardio history
+                cyp_risk_factor = 0
+                if smoking: cyp_risk_factor += 0.30
+                if 'Cardiovascular Disease' in medical_history: cyp_risk_factor += 0.25
+                
+                if cyp_risk_factor > 0.4: metabolizer_pred = "Poor"
+                elif cyp_risk_factor > 0.15: metabolizer_pred = "Intermediate"
                 else: metabolizer_pred = "Normal"
                 
-                st.success(f"AI Risk Score: **{ai_score:.2%}** — Predicted CYP2C19 Metabolizer: **{metabolizer_pred}**")
+                # APOE (Risk) Prediction Logic: Influenced by history (Cholesterol/Diabetes/Family)
+                apoe_risk_factor = 0
+                if 'Cholesterol' in medical_history: apoe_risk_factor += 0.20
+                if 'Diabetes' in medical_history: apoe_risk_factor += 0.25
+                if family_history: apoe_risk_factor += 0.35
                 
-                # Create demo PGx results summary based on AI prediction
-                results = [{"Gene":"CYP2C19","SNP ID":"rs4244285","Genotype":"Simulated","Effect":metabolizer_pred}]
+                if apoe_risk_factor > 0.5: apoe_pred = "High Risk"
+                elif apoe_risk_factor > 0.2: apoe_pred = "Medium Risk"
+                else: apoe_pred = "Low Risk"
                 
-                # Simulate a random APOE risk based on family history
-                apoe_pred = "Medium Risk" if family_history else "Low Risk"
-                if 'Cardiovascular Disease' in medical_history:
-                    apoe_pred = "High Risk"
+                # Final AI Score reflects combined worst case
+                combined_score = ai_score + cyp_risk_factor + apoe_risk_factor
+                final_ai_score = min(combined_score, 0.99)
                 
-                results.append({"Gene":"APOE","SNP ID":"rs429358","Genotype":"Simulated","Effect":apoe_pred})
+                st.success(f"AI Risk Score: **{final_ai_score:.2%}** — Predicted CYP2C19 Metabolizer: **{metabolizer_pred}**")
                 
-                # Update status dictionary
+                # Create final PGx results
+                results = [
+                    {"Gene":"CYP2C19","SNP ID":"rs4244285","Genotype":"Simulated","Effect":metabolizer_pred},
+                    {"Gene":"APOE","SNP ID":"rs429358","Genotype":"Simulated","Effect":apoe_pred}
+                ]
+                
                 status = {"CYP2C19":metabolizer_pred, "APOE":apoe_pred}
                 
                 # Store results and status in session state and rerun
@@ -453,7 +477,6 @@ with left_col:
     elif current_input_type == "JSON SNP Input":
         st.markdown("Paste JSON SNP object (e.g. `{\"rs4244285\":\"AA\"}`) in the text area. **Analysis is triggered on button press.**")
         
-        # Use a consistent sample with a potential risk for better demo effect
         initial_json = json.dumps({"rs4244285":"AG", "rs429358":"AA"}) 
         json_data = st.text_area("JSON SNP input", value=initial_json, height=120, key='json_input_data')
         
@@ -487,7 +510,6 @@ with left_col:
                 st.rerun()
         with colB:
             if uploaded_file:
-                # Simulate parsing and analysis based on content
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
@@ -599,13 +621,12 @@ with right_col:
       <div style='display:grid;grid-template-columns: 1fr 1fr; gap:10px;text-align:center;'>
         <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Metabolizer</strong><div style='color:{STATUS_COLORS.get(metabolizer_status, '#9E9E9E')}; font-weight:700;'>{metabolizer_status}</div></div>
         <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Risk Score</strong><div style='color:#00BCD4; font-weight:700;'>{random.uniform(0.05,0.95):.1%}</div></div>
-        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
-        <div style='padding:10px;border-radius:8px;background:#F5F5F5;'><strong>Prescriber</strong><div class='muted'>Dr. A. Khan</div></div>
+        <div style='padding:10px;border-radius:8px;background:#F5F5F5; grid-column: span 2;'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
       </div>
       <hr style='opacity:0.2;margin:15px 0'/>
       <div style='display:flex;gap:10px;flex-direction:column;'>
         <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#03A9F4;color:#fff;border:none;font-weight:600;cursor:pointer;'>📄 Generate Comprehensive Report</button></a>
-        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;'>🔁 Reset & New Run</button></a>
+        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;' onclick='window.parent.document.querySelector("button[kind=secondary]").click();'>🔁 Reset & New Run</button></a>
       </div>
     </div>
     """
@@ -618,6 +639,11 @@ with right_col:
     
     if st.button("Export anonymized PGx summary"):
         st.success("Anonymized PGx report generated (simulated).")
+    
+    # NEW: Dedicated Reset Button
+    if st.button("🔴 Reset Dashboard State"):
+        reset_dashboard()
+
 
 # ----------------------------
 # --- Footer / Notes ---
