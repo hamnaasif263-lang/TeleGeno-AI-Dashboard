@@ -71,49 +71,7 @@ EMERGENCY_STATUS_COLORS = {
 MEDICAL_HISTORY_OPTIONS = ['Hypertension', 'Cholesterol', 'Diabetes', 'Thyroid Disorder', 'Cardiovascular Disease', 'Previous Stroke', 'Kidney Disease']
 
 # ----------------------------
-# --- Page & Theme Setup ---
-# ----------------------------
-st.set_page_config(page_title="TeleGeno AI — Patient Dashboard", layout="wide", initial_sidebar_state="expanded")
-
-# Light theme injection for sleek look
-def _inject_css(light=True):
-    base = """
-    <style>
-      /* Main App Background - Slightly off-white */
-      .stApp { background-color:#F5F5F5; }
-      /* Sidebar Background - White */
-      .stSidebar { background-color:#FFFFFF; border-right: 1px solid #EEEEEE; }
-      /* Main Content Containers */
-      .block-container { color:#333333; }
-      
-      /* Card Styling - White with a subtle shadow/border */
-      .card { background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #DDDDDD; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-      
-      /* Typography */
-      h1, h2, h3, h4, .small-metric { color:#333333; }
-      .small-metric { font-size:24px; font-weight:700; }
-      .muted { color:#757575; font-size:13px; }
-      
-      /* Sidebar specific styles */
-      .stRadio > label { font-weight: 500; }
-      .stRadio { border: 1px solid #DDDDDD; padding: 10px; border-radius: 8px;}
-      
-      /* Custom Elements */
-      .patient-capsule { display:inline-block; padding:8px 16px; border-radius:999px; background:#BBDEFB; color:#1565C0; font-weight:700; border:1px solid #90CAF9; }
-      
-      /* Adjust Plotly to blend with light theme */
-      .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
-    
-      /* Medication Guidance Cards */
-      .med-card-content { color: #333333 !important; }
-    </style>
-    """
-    st.markdown(base, unsafe_allow_html=True)
-
-_inject_css(light=True)
-
-# ----------------------------
-# --- Helper Functions (No changes in logic) ---
+# --- Helper Functions ---
 # ----------------------------
 @st.cache_data
 def parse_json_input(json_data: str):
@@ -191,13 +149,71 @@ def metrics_from_results(status):
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
     return total, critical_pct, avg_hr, avg_bp
 
-# Function to reset dashboard state
+# Function to reset dashboard state (Used by Reset & New Run button)
 def reset_dashboard():
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
-    st.success("Dashboard state cleared!")
+    st.session_state['_input_type'] = "Demographics + History (AI)"
+    st.success("Dashboard state cleared! Ready for new run.")
     time.sleep(0.5)
     st.rerun()
+
+# Function to generate comprehensive report
+def generate_comprehensive_report(patient_name, results_list, status):
+    report = f"--- Comprehensive TeleGeno AI Report for {patient_name} ---\n"
+    report += f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    report += "--------------------------------------------------------\n\n"
+    
+    # 1. PGx Summary
+    metabolizer = infer_metabolizer_from_genotypes(results_list)
+    report += f"1. PHARMACOGENOMIC STATUS:\n"
+    report += f"   - CYP2C19 Metabolizer Status: {metabolizer}\n"
+    report += f"   - Overall PGx Status: {max(status.values(), key=lambda e: ['Unknown', 'Low Risk', 'Normal', 'Medium Risk', 'Intermediate', 'High Risk', 'Poor'].index(e)) if status else 'N/A'}\n\n"
+    
+    # 2. Detailed Genotype Results
+    report += "2. DETAILED GENOTYPE RESULTS:\n"
+    df = results_to_df(results_list)
+    if not df.empty:
+        report += df.to_markdown(index=False) + "\n\n"
+    else:
+        report += "   No genetic variants analyzed.\n\n"
+        
+    # 3. Medication Guidance
+    report += "3. ACTIONABLE MEDICATION GUIDANCE:\n"
+    meds = recommend_meds(status)
+    for gene, rec in meds.items():
+        report += f"   - {gene} ({status.get(gene, 'Unknown')} Status): {rec}\n"
+    
+    report += "\n--------------------------------------------------------\n"
+    return report
+
+
+# ----------------------------
+# --- Page & Theme Setup ---
+# ----------------------------
+st.set_page_config(page_title="TeleGeno AI — Patient Dashboard", layout="wide", initial_sidebar_state="expanded")
+
+# Light theme injection (Custom CSS)
+def _inject_css(light=True):
+    base = """
+    <style>
+      .stApp { background-color:#F5F5F5; }
+      .stSidebar { background-color:#FFFFFF; border-right: 1px solid #EEEEEE; }
+      .block-container { color:#333333; }
+      .card { background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #DDDDDD; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+      h1, h2, h3, h4, .small-metric { color:#333333; }
+      .small-metric { font-size:24px; font-weight:700; }
+      .muted { color:#757575; font-size:13px; }
+      .stRadio > label { font-weight: 500; }
+      .stRadio { border: 1px solid #DDDDDD; padding: 10px; border-radius: 8px;}
+      .patient-capsule { display:inline-block; padding:8px 16px; border-radius:999px; background:#BBDEFB; color:#1565C0; font-weight:700; border:1px solid #90CAF9; }
+      .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
+      .med-card-content { color: #333333 !important; }
+    </style>
+    """
+    st.markdown(base, unsafe_allow_html=True)
+
+_inject_css(light=True)
 
 # ----------------------------
 # --- Sidebar: inputs ---
@@ -211,7 +227,7 @@ st.sidebar.markdown("---")
 
 # --- Initial Setup for Input State ---
 if '_input_type' not in st.session_state:
-    st.session_state['_input_type'] = "JSON SNP Input"
+    st.session_state['_input_type'] = "Demographics + History (AI)" # Default to AI for quick demo
 if 'pgx_results_list' not in st.session_state:
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
@@ -219,13 +235,11 @@ if 'pgx_results_list' not in st.session_state:
 # Only show PGx inputs if Emergency is NOT enabled
 if not emergency_tab:
     st.sidebar.markdown("### 🧬 Genomic Data Input Method")
-    # All 3 input methods under one radio button for consolidation
     input_type = st.sidebar.radio("Select Input Source", 
                                   ["JSON SNP Input", "Simulated VCF", "Demographics + History (AI)"], 
                                   key="_input_type")
     st.sidebar.markdown("---")
     
-    # Logic to simulate random SNPs
     if st.sidebar.button("Simulate random patient SNPs"):
         st.session_state["_simulate_snps"] = True
 
@@ -253,89 +267,118 @@ with header_col2:
 st.markdown("---")
 
 # ----------------------------
-# --- Emergency Screen Takeover (Updated to show Metabolizer Status) ---
+# --- Emergency Screen Takeover (Finalized) ---
 # ----------------------------
 if emergency_tab:
-    # Use the entire screen for emergency
     st.markdown("## 🚨 Live Emergency Triage", unsafe_allow_html=True)
     
-    # Use two-columns for better layout on the full page
-    e_col1, e_col2 = st.columns([2, 1])
+    e_col1, e_col2 = st.columns([3, 2])
 
     with e_col1:
-        st.markdown("### Step 1: Capture Patient Vitals via Webcam")
-        if not _HAS_CV2:
-            st.error("OpenCV not installed: Webcam emergency features are disabled. Install `opencv-python` to enable.")
-            if st.button("Generate Simulated Vitals & Report"):
-                cam = True # Mock camera input
-            else:
-                cam = False
-        else:
-            cam = st.camera_input("Capture patient photo for simulated vitals check")
+        st.markdown("### Step 1: Capture Patient Vitals & Context")
         
-        if cam:
-            # Since we can't fully run CV2 here, we mock the vitals extraction
+        # Emergency context inputs (NEW)
+        with st.form("emergency_form"):
+            col_age, col_gender = st.columns(2)
+            age = col_age.number_input("Patient Age", 0, 120, 55, key='em_age')
+            gender = col_gender.selectbox("Gender", ["Male", "Female", "Other"], key='em_gender')
+            
+            # Use multi-select for history, pre-filling from main dashboard state if possible
+            default_med_hist = st.session_state.get('ai_med_hist', [])
+            medical_history = st.multiselect(
+                "Known Medical History", 
+                options=MEDICAL_HISTORY_OPTIONS, 
+                default=default_med_hist,
+                key='em_med_hist'
+            )
+            
+            # Webcam/Simulated Vitals Capture
+            if not _HAS_CV2:
+                st.error("OpenCV not installed: Webcam features disabled.")
+                simulate_vitals = st.form_submit_button("Simulate Vitals & Run Triage")
+                cam = True # Mock camera input is always "on" for simulation run
+            else:
+                cam = st.camera_input("Capture patient photo for vitals check")
+                simulate_vitals = st.form_submit_button("Run Triage")
+
+        if simulate_vitals or cam:
+            
+            # --- MOCK VITAL PREDICTION ---
+            # Simulate HR/BP influenced by age and history (e.g., Hypertension)
             vitals = {
-                "hr": random.randint(60,120),
-                "bp_sys": random.randint(100,170),
-                "bp_dia": random.randint(60,110)
+                "hr": random.randint(70, 100) + (15 if 'Hypertension' in medical_history else 0),
+                "bp_sys": random.randint(110, 150) + (25 if 'Hypertension' in medical_history else 0),
+                "bp_dia": random.randint(70, 95) + (10 if 'Hypertension' in medical_history else 0)
             }
             
-            # quick emergency summary logic
+            # --- MOCK PGx PREDICTION FOR EMERGENCY SCREEN (Guaranteed Prediction) ---
+            cyp_risk_factor = 0
+            if 'Cardiovascular Disease' in medical_history: cyp_risk_factor += 0.3
+            if 'Diabetes' in medical_history: cyp_risk_factor += 0.2
+            if age > 65: cyp_risk_factor += 0.15
+
+            if cyp_risk_factor > 0.4: metabolizer_status = "Poor"
+            elif cyp_risk_factor > 0.15: metabolizer_status = "Intermediate"
+            else: metabolizer_status = "Normal"
+
+            # --- DETERMINE OVERALL STATUS ---
             status_overall = "Normal"
-            if vitals['hr']>110 or vitals['bp_sys']>160:
+            if vitals['hr']>130 or vitals['bp_sys']>170 or metabolizer_status == "Poor":
                 status_overall = "Critical"
-            elif vitals['hr']>90 or vitals['bp_sys']>135:
+            elif vitals['hr']>100 or vitals['bp_sys']>140 or metabolizer_status == "Intermediate":
                 status_overall = "Warning"
-            
+
             st.markdown("---")
             st.markdown("### Step 2: Vitals & Triage Summary")
             
-            # --- FETCH & DISPLAY METABOLIZER STATUS ---
-            current_results = st.session_state.get('pgx_results_list', [])
-            metabolizer_status = infer_metabolizer_from_genotypes(current_results)
+            # --- Display Metrics (PGx Status, HR, BP, Triage) ---
+            col_metab, col_hr, col_bp, col_triage = st.columns(4)
             
-            v1, v2, v3 = st.columns(3)
+            # Metabolizer Status Card
+            bg_pgx = STATUS_COLORS.get(metabolizer_status, '#9E9E9E')
+            col_metab.markdown(f"<div class='card' style='padding:10px; background:{bg_pgx}; color:white;'>"
+                                f"<strong>PGx Metabolizer:</strong><br/>"
+                                f"<span style='font-size: 16px; font-weight: bold;'>{metabolizer_status}</span>"
+                                f"</div>", unsafe_allow_html=True)
             
-            # Metabolizer Status (Primary PGx warning)
-            v1.markdown(f"<div class='card' style='padding:10px; background:#f0f0f0; border-left: 5px solid {STATUS_COLORS.get(metabolizer_status, '#9E9E9E')};'>"
-                        f"<strong>PGx Metabolizer:</strong><br/>"
-                        f"<span style='font-size: 16px; color:#1565C0;'>{metabolizer_status}</span>"
-                        f"</div>", unsafe_allow_html=True)
+            # HR Metric
+            col_hr.metric("Heart Rate", f"**{vitals['hr']}** bpm")
             
-            # Vitals
-            v2.metric("Heart Rate", f"**{vitals['hr']}** bpm", delta_color="normal")
-            
-            # Triage Status
-            color = EMERGENCY_STATUS_COLORS.get(status_overall, "#9E9E9E")
-            v3.markdown(f"<div class='card' style='background-color: {color}; color: white; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; margin: 0; padding: 5px;'>"
-                        f"<strong>{status_overall.upper()}</strong>"
-                        f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
-                        f"</div>", unsafe_allow_html=True)
+            # BP Metric (FIXED: Now displaying correctly)
+            col_bp.metric("Blood Pressure", f"**{vitals['bp_sys']}/{vitals['bp_dia']}** mmHg")
 
+            # Triage Status Box
+            color = EMERGENCY_STATUS_COLORS.get(status_overall, "#9E9E9E")
+            col_triage.markdown(f"<div class='card' style='background-color: {color}; color: white; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; margin: 0; padding: 5px;'>"
+                                f"<strong>{status_overall.upper()}</strong>"
+                                f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
+                                f"</div>", unsafe_allow_html=True)
+
+            # --- Actionable Advice ---
+            st.markdown("### Step 3: Next Steps & Advice")
             
-            # Report generation (assuming current results from session state if available)
-            current_status = st.session_state.get('pgx_status', {})
+            if status_overall == "Critical":
+                st.warning("⚠️ **CRITICAL ACTION REQUIRED:** Immediate medical intervention. Avoid CYP2C19-sensitive drugs (Clopidogrel) until PGx status is confirmed.")
+                st.markdown("* **Precaution:** Prepare alternative medication (e.g., Ticagrelor) if acute need arises.")
+            elif status_overall == "Warning":
+                st.info("🟡 **WARNING:** Close monitoring and specialist consult advised. PGx status suggests potential drug dosage adjustment or alternative therapy.")
+                st.markdown("* **Advice:** Monitor BP closely. Review full PGx dashboard for detailed medication recommendations.")
+            else:
+                st.success("✅ **NORMAL:** Vitals within expected ranges. Continue routine monitoring.")
+                st.markdown("* **Advice:** Proceed to full PGx dashboard for proactive care planning.")
             
+            # Report Generation
             report = f"Emergency Report - {patient_name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             report += f"Triage Status: {status_overall}\n"
             report += f"HR: {vitals['hr']} bpm\nBP: {vitals['bp_sys']}/{vitals['bp_dia']} mmHg\n"
+            report += f"Predicted Metabolizer: {metabolizer_status}\n"
             
-            if current_status:
-                report += f"Metabolizer Status (CYP2C19): {metabolizer_status}\n"
-                for gene, rec in recommend_meds(current_status).items():
-                    report += f"PGx Guidance ({gene}): {rec}\n"
-            
-            st.markdown("### Step 3: Finalize Report")
-            st.info(f"The overall status is **{status_overall.upper()}**. Review the PGx data on the main dashboard for medication-specific concerns.")
             st.download_button(
                 "Download Emergency Report", 
                 report, 
                 file_name=f"emergency_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             )
-        else:
-            st.info("Awaiting webcam input to perform live triage...")
-    
+
     with e_col2:
         st.markdown("### Triage Action Guide")
         st.markdown(
@@ -350,7 +393,7 @@ if emergency_tab:
 
     st.markdown("---")
     st.warning("Deactivate 'Enable Emergency Assessment' in the sidebar to return to the main PGx dashboard.")
-    st.stop() # Stops execution of the rest of the main dashboard when emergency is active
+    st.stop()
 
 
 # ----------------------------
@@ -399,7 +442,7 @@ with left_col:
     current_input_type = st.session_state.get("_input_type")
     
     # ----------------------------------------------------
-    # A. Demographics + History (AI) Input (Updated Logic)
+    # A. Demographics + History (AI) Input
     # ----------------------------------------------------
     if current_input_type == "Demographics + History (AI)":
         st.markdown("Fill out demographics and history for **AI risk prediction** (simulated PGx inference).")
@@ -625,12 +668,27 @@ with right_col:
       </div>
       <hr style='opacity:0.2;margin:15px 0'/>
       <div style='display:flex;gap:10px;flex-direction:column;'>
-        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#03A9F4;color:#fff;border:none;font-weight:600;cursor:pointer;'>📄 Generate Comprehensive Report</button></a>
-        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;' onclick='window.parent.document.querySelector("button[kind=secondary]").click();'>🔁 Reset & New Run</button></a>
+        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#03A9F4;color:#fff;border:none;font-weight:600;cursor:pointer;' name="Generate Comprehensive Report">📄 Generate Comprehensive Report</button></a>
+        
+        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;' name="Reset & New Run">🔁 Reset & New Run</button></a>
       </div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
+    
+    # Handle the functional buttons outside the raw HTML block
+    if st.button("Generate Comprehensive Report", key='comp_report_btn'):
+        report_content = generate_comprehensive_report(patient_name, results, status)
+        st.download_button(
+            "Download Comprehensive Report", 
+            report_content, 
+            file_name=f"Comprehensive_Report_{patient_name}_{datetime.now().strftime('%Y%m%d')}.md",
+            mime="text/markdown"
+        )
+        st.success("Comprehensive Report ready for download!")
+
+    if st.button("Reset & New Run", key='reset_btn'):
+        reset_dashboard()
 
     st.markdown("---")
     st.markdown("### Quick Actions")
@@ -639,10 +697,6 @@ with right_col:
     
     if st.button("Export anonymized PGx summary"):
         st.success("Anonymized PGx report generated (simulated).")
-    
-    # NEW: Dedicated Reset Button
-    if st.button("🔴 Reset Dashboard State"):
-        reset_dashboard()
 
 
 # ----------------------------
