@@ -149,11 +149,13 @@ def metrics_from_results(status):
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
     return total, critical_pct, avg_hr, avg_bp
 
-# Function to reset dashboard state (Used by Reset & New Run button)
+# Function to reset dashboard state (FIXED: Removed problematic session_state update)
 def reset_dashboard():
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
-    st.session_state['_input_type'] = "Demographics + History (AI)"
+    
+    # The line that caused the error has been removed: st.session_state['_input_type'] = "Demographics + History (AI)"
+
     st.success("Dashboard state cleared! Ready for new run.")
     time.sleep(0.5)
     st.rerun()
@@ -677,6 +679,7 @@ with right_col:
     st.markdown(card_html, unsafe_allow_html=True)
     
     # Handle the functional buttons outside the raw HTML block
+    # These buttons must have different keys than the HTML buttons above
     if st.button("Generate Comprehensive Report", key='comp_report_btn'):
         report_content = generate_comprehensive_report(patient_name, results, status)
         st.download_button(
@@ -687,7 +690,7 @@ with right_col:
         )
         st.success("Comprehensive Report ready for download!")
 
-    if st.button("Reset & New Run", key='reset_btn'):
+    if st.button("Reset & New Run", key='reset_btn_action'): # Changed key to avoid conflict
         reset_dashboard()
 
     st.markdown("---")
