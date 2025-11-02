@@ -184,6 +184,26 @@ def generate_comprehensive_report(patient_name, results_list, status):
     report += "\n--------------------------------------------------------\n"
     return report
 
+# CALLBACK function for VCF upload to handle file object and store data reliably
+def handle_vcf_upload():
+    uploaded_file = st.session_state.get('vcf_uploader_key')
+    if uploaded_file is not None:
+        try:
+            content = uploaded_file.getvalue().decode(errors="ignore")
+            snps_input = parse_vcf_simulator(content)
+            results, status = analyze_snps(snps_input)
+            
+            # Store results reliably in session state
+            st.session_state["pgx_results_list"] = results 
+            st.session_state["pgx_status"] = status
+            st.session_state["vcf_processed_message"] = "Uploaded VCF data analyzed successfully."
+        except Exception as e:
+            st.session_state["vcf_processed_message"] = f"Error processing VCF: {e}"
+        st.rerun()
+    else:
+        # Clear message if file is cleared
+        st.session_state["vcf_processed_message"] = ""
+
 
 # ----------------------------
 # --- Page & Theme Setup ---
@@ -231,6 +251,8 @@ if '_input_type' not in st.session_state:
 if 'pgx_results_list' not in st.session_state:
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
+if 'vcf_processed_message' not in st.session_state:
+    st.session_state['vcf_processed_message'] = ""
 
 # Only show PGx inputs if Emergency is NOT enabled
 if not emergency_tab:
@@ -516,10 +538,12 @@ with left_col:
                 st.error("Invalid JSON. Please check formatting.")
     
     # ----------------------------------------------------
-    # C. Simulated VCF Input
+    # C. Simulated VCF Input (FIXED)
     # ----------------------------------------------------
     elif current_input_type == "Simulated VCF":
         st.markdown("Upload a VCF-like file, or use the simulator button below. **Note**: VCF parsing is simulated to assign random genotypes.")
+        
+        # KEY FOR UPLOADER MUST BE UNIQUE AND CONSISTENT
         uploaded_file = st.file_uploader("Upload VCF-like file", type=['vcf','txt'], key='vcf_uploader')
         
         colA, colB = st.columns([1,3])
@@ -532,14 +556,21 @@ with left_col:
                 st.success("Simulated VCF parsed.")
                 st.rerun()
         with colB:
+            # FIX VCF RELOAD STABILITY: Use callback to process uploaded file immediately
             if uploaded_file:
-                # FIX: VCF processing now triggers the full data flow for display
+                # Process the file content
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
+                
+                # Store results reliably in session state
                 st.session_state["pgx_results_list"] = results 
                 st.session_state["pgx_status"] = status
+                
+                # FIX: Use st.info for processing feedback
                 st.info("VCF processing complete. Displaying results.") 
+                
+                # Rerun to display the stored results
                 st.rerun()
     
     # Display message if no input is selected in the sidebar
