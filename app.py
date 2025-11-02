@@ -84,7 +84,6 @@ def parse_json_input(json_data: str):
 
 @st.cache_data
 def parse_vcf_simulator(vcf_content: str):
-    # Added performance optimization hint (caching based on content hash)
     random.seed(hash(vcf_content) % 1000)
     lines = vcf_content.splitlines()
     snps = {}
@@ -96,7 +95,6 @@ def parse_vcf_simulator(vcf_content: str):
             snp_id = parts[2]
             for gene in SNP_EFFECTS:
                 if snp_id in SNP_EFFECTS[gene]:
-                    # Randomly assign a genotype for simulation purposes
                     snps[snp_id] = random.choice(["AA", "AG", "GG"])
     return snps
 
@@ -115,7 +113,6 @@ def analyze_snps(snps):
                 results.append({"Gene": gene, "SNP ID": snp_id, "Genotype": genotype, "Effect": effect})
                 gene_effects.append(effect)
         if gene_effects:
-            # Determine the single worst effect for the gene summary
             worst = max(gene_effects, key=lambda e: severity_order.index(e) if e in severity_order else 0)
             status[gene] = worst
     return results, status
@@ -143,6 +140,7 @@ def infer_metabolizer_from_genotypes(results_list):
 
 # A small function to compute a population-style aggregated metric (for demo)
 def metrics_from_results(status):
+    # NOTE: This function is preserved but its output is now HIDDEN for relevance/aesthetic reasons.
     total = 1 
     critical_pct = 100 if any(s in status.values() for s in ["Poor", "High Risk"]) else 0
     avg_hr = random.randint(60, 95)
@@ -210,8 +208,7 @@ def _inject_css(light=True):
       .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
       .med-card-content { color: #333333 !important; }
       
-      /* FIX: Reduce font size for Treemap title and labels */
-      /* Increased uniformtext_minsize to make labels readable */
+      /* FIX: Ensure chart text is visible and charts are compact */
       .modebar { margin-top: -30px !important; }
     </style>
     """
@@ -406,25 +403,11 @@ if emergency_tab:
 
 
 # ----------------------------
-# --- Top Metric Cards (Conditional Display - FINAL FIX) ---
+# --- Top Metric Cards (REMOVED: Final Aesthetic Fix) ---
 # ----------------------------
-current_input = st.session_state.get('_input_type')
-is_pgx_only = current_input == "JSON SNP Input" or current_input == "Simulated VCF"
-
-# Only show metrics if Demographics is selected. Hide them completely for JSON/VCF, solving the irrelevance issue.
-if not is_pgx_only:
-    total, critical_pct, avg_hr, avg_bp = metrics_from_results(status)
-
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-    mcol1.markdown(f"<div class='card'><div class='muted'>Total Patients</div><div class='small-metric'>{total}</div></div>", unsafe_allow_html=True)
-    mcol2.markdown(f"<div class='card' style='border-left: 5px solid {EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#EEEEEE'};'><div class='muted'>Critical PGx Flag</div><div class='small-metric' style='color:{EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#4CAF50'}'>{critical_pct}%</div></div>", unsafe_allow_html=True)
-    mcol3.markdown(f"<div class='card'><div class='muted'>Avg Heart Rate (Pop)</div><div class='small-metric'>{avg_hr} bpm</div></div>", unsafe_allow_html=True)
-    mcol4.markdown(f"<div class='card'><div class='muted'>Avg Blood Pressure (Pop)</div><div class='small-metric'>{avg_bp}</div></div>", unsafe_allow_html=True)
-    
-    st.markdown("")
-else:
-    # Hide metrics completely for JSON/VCF inputs
-    st.markdown("<br/>", unsafe_allow_html=True)
+# Metrics removed entirely as they are irrelevant and confusing in single-patient PGx context.
+# We keep only a simple divider for visual flow.
+st.markdown("---")
     
 
 # ----------------------------
@@ -587,7 +570,7 @@ with left_col:
             fig1 = px.bar(gen_counts, x="Genotype", y="Count", title="Count of Observed Genotypes", template=plot_template, 
                           color_discrete_sequence=["#2979FF"]) # Blue
             fig1.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", title_font_size=14)
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, use_container_width=True, height=280) # Reduced Height
             st.caption("Interpretation: Visualizing the frequency of homozygous (e.g., AA) vs. heterozygous (e.g., AG) genotypes. The genotype determines the resulting effect.")
             
         with c2:
@@ -607,9 +590,9 @@ with left_col:
         treemap_df = df.groupby(["Gene","Effect"]).size().reset_index(name="count")
         fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
                           template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
-        # FIX: Adjusted font size and significantly reduced height for better flow
+        # FIX: Aggressively reduced height for better flow and aesthetics
         fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10), title_font_size=14, uniformtext_minsize=10, uniformtext_mode='hide') 
-        st.plotly_chart(fig3, use_container_width=True, height=250)
+        st.plotly_chart(fig3, use_container_width=True, height=200) # Minimum height for readability
         st.caption("Interpretation: Shows which genes (CYP2C19/APOE) are associated with the most concerning effects. Larger blocks indicate more SNPs contributing to that specific effect.")
         
         st.markdown("---")
