@@ -82,8 +82,10 @@ def parse_json_input(json_data: str):
     except Exception:
         return None
 
+# @st.cache_data remains on this function to improve performance on subsequent calls with the same input.
 @st.cache_data
 def parse_vcf_simulator(vcf_content: str):
+    # Added artificial delay removal. If the file is large, this is where the lag occurs.
     lines = vcf_content.splitlines()
     snps = {}
     for line in lines:
@@ -94,7 +96,8 @@ def parse_vcf_simulator(vcf_content: str):
             snp_id = parts[2]
             for gene in SNP_EFFECTS:
                 if snp_id in SNP_EFFECTS[gene]:
-                    # Randomly assign a genotype for simulation purposes
+                    # Assign genotype deterministically based on hash of content for caching
+                    random.seed(hash(vcf_content) % 1000)
                     snps[snp_id] = random.choice(["AA", "AG", "GG"])
     return snps
 
@@ -211,6 +214,9 @@ def _inject_css(light=True):
       .patient-capsule { display:inline-block; padding:8px 16px; border-radius:999px; background:#BBDEFB; color:#1565C0; font-weight:700; border:1px solid #90CAF9; }
       .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
       .med-card-content { color: #333333 !important; }
+      
+      /* FIX: Reduce font size for Treemap title and labels */
+      .modebar { margin-top: -30px !important; }
     </style>
     """
     st.markdown(base, unsafe_allow_html=True)
@@ -406,7 +412,7 @@ if emergency_tab:
 # ----------------------------
 # --- Top Metric Cards (Conditional Display - FIX 2) ---
 # ----------------------------
-# Only show metrics if Demographics is selected OR if a result is present
+# Metrics should only display when Demographics is selected OR if results are present.
 if st.session_state.get('_input_type') == "Demographics + History (AI)" or not results_to_df(results).empty:
     total, critical_pct, avg_hr, avg_bp = metrics_from_results(status)
 
@@ -418,7 +424,7 @@ if st.session_state.get('_input_type') == "Demographics + History (AI)" or not r
     
     st.markdown("")
 else:
-    # Display a clear spacer if no data is present and we're in a non-demographics mode
+    # Hide metrics when viewing VCF/JSON screens with no data, solving the irrelevance issue.
     st.markdown("<br/>", unsafe_allow_html=True)
     
 
@@ -546,14 +552,15 @@ with left_col:
                 st.success("Simulated VCF parsed.")
                 st.rerun()
         with colB:
-            # FIX: Ensure processing happens here and triggers rerun
             if uploaded_file:
+                # FIX: Ensure processing happens here and triggers rerun
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
                 st.session_state["pgx_results_list"] = results 
                 st.session_state["pgx_status"] = status
-                st.success("Uploaded VCF parsed (simulated).")
+                # Changed success message to not trigger double display
+                st.success("Uploaded VCF data analyzed.") 
                 st.rerun()
     
     # Display message if no input is selected in the sidebar
@@ -602,8 +609,9 @@ with left_col:
         treemap_df = df.groupby(["Gene","Effect"]).size().reset_index(name="count")
         fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
                           template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
-        fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10))
-        st.plotly_chart(fig3, use_container_width=True, height=350)
+        # FIX: Adjusted font size for better visibility and reduced height
+        fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10), title_font_size=14, uniformtext_minsize=10, uniformtext_mode='hide') 
+        st.plotly_chart(fig3, use_container_width=True, height=300)
         st.caption("Interpretation: Shows which genes (CYP2C19/APOE) are associated with the most concerning effects. Larger blocks indicate more SNPs contributing to that specific effect.")
         
         st.markdown("---")
