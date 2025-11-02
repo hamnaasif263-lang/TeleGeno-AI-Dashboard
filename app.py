@@ -140,7 +140,6 @@ def infer_metabolizer_from_genotypes(results_list):
 
 # A small function to compute a population-style aggregated metric (for demo)
 def metrics_from_results(status):
-    # NOTE: This function is preserved but its output is now HIDDEN for relevance/aesthetic reasons.
     total = 1 
     critical_pct = 100 if any(s in status.values() for s in ["Poor", "High Risk"]) else 0
     avg_hr = random.randint(60, 95)
@@ -208,7 +207,7 @@ def _inject_css(light=True):
       .plotly-graph-div .modebar-btn { background: #FFFFFF !important; color: #616161 !important; }
       .med-card-content { color: #333333 !important; }
       
-      /* FIX: Ensure chart text is visible and charts are compact */
+      /* Ensure chart text is visible and charts are compact */
       .modebar { margin-top: -30px !important; }
     </style>
     """
@@ -406,7 +405,6 @@ if emergency_tab:
 # --- Top Metric Cards (REMOVED: Final Aesthetic Fix) ---
 # ----------------------------
 # Metrics removed entirely as they are irrelevant and confusing in single-patient PGx context.
-# We keep only a simple divider for visual flow.
 st.markdown("---")
     
 
@@ -535,6 +533,7 @@ with left_col:
                 st.rerun()
         with colB:
             if uploaded_file:
+                # FIX: Ensures VCF processing happens and displays results
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
@@ -651,7 +650,7 @@ with right_col:
         <div style='padding:10px;border-radius:8px;background:#F5F5F5; grid-column: span 2;'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
       </div>
       <hr style='opacity:0.2;margin:15px 0'/>
-      </div>
+    </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
     
