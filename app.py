@@ -149,7 +149,7 @@ def metrics_from_results(status):
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
     return total, critical_pct, avg_hr, avg_bp
 
-# Function to reset dashboard state (FIXED: Removed problematic session_state update)
+# Function to reset dashboard state 
 def reset_dashboard():
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
@@ -556,7 +556,8 @@ with left_col:
                 results, status = analyze_snps(snps_input)
                 st.session_state["pgx_results_list"] = results 
                 st.session_state["pgx_status"] = status
-                st.success("Uploaded VCF data analyzed.") 
+                # FIX: Removed success message that caused slow double-rerun
+                st.info("VCF processing complete. Displaying results.") 
                 st.rerun()
     
     # Display message if no input is selected in the sidebar
@@ -667,17 +668,12 @@ with right_col:
         <div style='padding:10px;border-radius:8px;background:#F5F5F5; grid-column: span 2;'><strong>Follow-up</strong><div class='muted'>24–48h</div></div>
       </div>
       <hr style='opacity:0.2;margin:15px 0'/>
-      <div style='display:flex;gap:10px;flex-direction:column;'>
-        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#03A9F4;color:#fff;border:none;font-weight:600;cursor:pointer;' name="Generate Comprehensive Report">📄 Generate Comprehensive Report</button></a>
-        
-        <a href="#"><button style='width:100%;padding:10px;border-radius:8px;background:#EEEEEE;color:#333;border:1px solid #DDDDDD;font-weight:600;cursor:pointer;' name="Reset & New Run">🔁 Reset & New Run</button></a>
       </div>
-    </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
     
-    # Handle the functional buttons outside the raw HTML block
-    if st.button("Generate Comprehensive Report", key='comp_report_btn'):
+    # Handle the functional buttons outside the raw HTML block (CLEANUP COMPLETE)
+    if st.button("📄 Generate Comprehensive Report", key='comp_report_btn_display'):
         report_content = generate_comprehensive_report(patient_name, results, status)
         st.download_button(
             "Download Comprehensive Report", 
@@ -687,7 +683,7 @@ with right_col:
         )
         st.success("Comprehensive Report ready for download!")
 
-    if st.button("Reset & New Run", key='reset_btn_action'): 
+    if st.button("🔁 Reset & New Run", key='reset_btn_display'): 
         reset_dashboard()
 
     st.markdown("---")
