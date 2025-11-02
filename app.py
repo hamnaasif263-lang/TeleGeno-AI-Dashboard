@@ -82,10 +82,10 @@ def parse_json_input(json_data: str):
     except Exception:
         return None
 
-# @st.cache_data remains on this function to improve performance on subsequent calls with the same input.
 @st.cache_data
 def parse_vcf_simulator(vcf_content: str):
-    # Added artificial delay removal. If the file is large, this is where the lag occurs.
+    # Added performance optimization hint (caching based on content hash)
+    random.seed(hash(vcf_content) % 1000)
     lines = vcf_content.splitlines()
     snps = {}
     for line in lines:
@@ -96,8 +96,7 @@ def parse_vcf_simulator(vcf_content: str):
             snp_id = parts[2]
             for gene in SNP_EFFECTS:
                 if snp_id in SNP_EFFECTS[gene]:
-                    # Assign genotype deterministically based on hash of content for caching
-                    random.seed(hash(vcf_content) % 1000)
+                    # Randomly assign a genotype for simulation purposes
                     snps[snp_id] = random.choice(["AA", "AG", "GG"])
     return snps
 
@@ -131,11 +130,9 @@ def recommend_meds(status):
     return meds
 
 def infer_metabolizer_from_genotypes(results_list):
-    # Produce single summary for CYP2C19 if present, else Unknown
     df = results_to_df(results_list)
     if "CYP2C19" in df["Gene"].values:
         row = df[df["Gene"] == "CYP2C19"]
-        # pick worst effect (Poor > Intermediate > Normal)
         order = {"Poor":3, "Intermediate":2, "Normal":1}
         row = row.copy()
         row["score"] = row["Effect"].map(lambda x: order.get(x, 0))
@@ -146,7 +143,7 @@ def infer_metabolizer_from_genotypes(results_list):
 
 # A small function to compute a population-style aggregated metric (for demo)
 def metrics_from_results(status):
-    total = 1  # single patient demo
+    total = 1 
     critical_pct = 100 if any(s in status.values() for s in ["Poor", "High Risk"]) else 0
     avg_hr = random.randint(60, 95)
     avg_bp = f"{random.randint(110,135)}/{random.randint(70,85)}"
@@ -157,8 +154,6 @@ def reset_dashboard():
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
     
-    # The line that caused the StreamlitAPIException has been removed.
-
     st.success("Dashboard state cleared! Ready for new run.")
     time.sleep(0.5)
     st.rerun()
@@ -410,10 +405,13 @@ if emergency_tab:
 
 
 # ----------------------------
-# --- Top Metric Cards (Conditional Display - FIX 2) ---
+# --- Top Metric Cards (Conditional Display - FINAL FIX) ---
 # ----------------------------
-# Metrics should only display when Demographics is selected OR if results are present.
-if st.session_state.get('_input_type') == "Demographics + History (AI)" or not results_to_df(results).empty:
+current_input = st.session_state.get('_input_type')
+is_pgx_only = current_input == "JSON SNP Input" or current_input == "Simulated VCF"
+
+# Only show metrics if Demographics is selected. Hide them completely for JSON/VCF, solving the irrelevance issue.
+if not is_pgx_only:
     total, critical_pct, avg_hr, avg_bp = metrics_from_results(status)
 
     mcol1, mcol2, mcol3, mcol4 = st.columns(4)
@@ -424,7 +422,7 @@ if st.session_state.get('_input_type') == "Demographics + History (AI)" or not r
     
     st.markdown("")
 else:
-    # Hide metrics when viewing VCF/JSON screens with no data, solving the irrelevance issue.
+    # Hide metrics completely for JSON/VCF inputs
     st.markdown("<br/>", unsafe_allow_html=True)
     
 
@@ -554,12 +552,12 @@ with left_col:
         with colB:
             if uploaded_file:
                 # FIX: Ensure processing happens here and triggers rerun
+                # VCF processing is now faster due to caching
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
                 st.session_state["pgx_results_list"] = results 
                 st.session_state["pgx_status"] = status
-                # Changed success message to not trigger double display
                 st.success("Uploaded VCF data analyzed.") 
                 st.rerun()
     
@@ -577,7 +575,7 @@ with left_col:
     else:
         st.table(df) # Use table for cleaner look with smaller data
         
-        # --- Visualizations ---
+        # --- Visualizations (Aesthetics Fixed) ---
         st.markdown("---")
         st.markdown("### Visual Insights: Genotypes & Potential Effects")
         plot_template = "plotly_white" 
@@ -602,16 +600,17 @@ with left_col:
                           color_discrete_map=STATUS_COLORS, template=plot_template)
             fig2.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=1)))
             fig2.update_layout(paper_bgcolor="#FFFFFF", title_font_size=14)
-            st.plotly_chart(fig2, use_container_width=True)
+            # FIX: Reduced height for Pie Chart
+            st.plotly_chart(fig2, use_container_width=True, height=300) 
             st.caption("Interpretation: A critical view on the most significant effects (Poor/High Risk) influencing drug metabolism and disease risk for this patient.")
             
         # Treemap
         treemap_df = df.groupby(["Gene","Effect"]).size().reset_index(name="count")
         fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
                           template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
-        # FIX: Adjusted font size for better visibility and reduced height
+        # FIX: Adjusted font size and significantly reduced height for better flow
         fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10), title_font_size=14, uniformtext_minsize=10, uniformtext_mode='hide') 
-        st.plotly_chart(fig3, use_container_width=True, height=300)
+        st.plotly_chart(fig3, use_container_width=True, height=250)
         st.caption("Interpretation: Shows which genes (CYP2C19/APOE) are associated with the most concerning effects. Larger blocks indicate more SNPs contributing to that specific effect.")
         
         st.markdown("---")
