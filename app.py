@@ -551,8 +551,6 @@ with left_col:
                 st.rerun()
         with colB:
             if uploaded_file:
-                # FIX: Ensure processing happens here and triggers rerun
-                # VCF processing is now faster due to caching
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
