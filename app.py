@@ -154,7 +154,7 @@ def reset_dashboard():
     st.session_state['pgx_results_list'] = []
     st.session_state['pgx_status'] = {}
     
-    # The line that caused the error has been removed: st.session_state['_input_type'] = "Demographics + History (AI)"
+    # The line that caused the StreamlitAPIException has been removed.
 
     st.success("Dashboard state cleared! Ready for new run.")
     time.sleep(0.5)
@@ -268,6 +268,11 @@ with header_col2:
 
 st.markdown("---")
 
+# Retrieve current results from session state 
+results = st.session_state.get('pgx_results_list', [])
+status = st.session_state.get('pgx_status', {})
+
+
 # ----------------------------
 # --- Emergency Screen Takeover (Finalized) ---
 # ----------------------------
@@ -346,7 +351,7 @@ if emergency_tab:
             # HR Metric
             col_hr.metric("Heart Rate", f"**{vitals['hr']}** bpm")
             
-            # BP Metric (FIXED: Now displaying correctly)
+            # BP Metric 
             col_bp.metric("Blood Pressure", f"**{vitals['bp_sys']}/{vitals['bp_dia']}** mmHg")
 
             # Triage Status Box
@@ -399,36 +404,23 @@ if emergency_tab:
 
 
 # ----------------------------
-# --- Main Dashboard (Not Emergency) ---
+# --- Top Metric Cards (Conditional Display - FIX 2) ---
 # ----------------------------
+# Only show metrics if Demographics is selected OR if a result is present
+if st.session_state.get('_input_type') == "Demographics + History (AI)" or not results_to_df(results).empty:
+    total, critical_pct, avg_hr, avg_bp = metrics_from_results(status)
 
-# Handle simulation button click (from sidebar)
-if st.session_state.get("_simulate_snps"):
-    all_snps = [s for gene in SNP_EFFECTS for s in SNP_EFFECTS[gene] if s not in ("Metabolite_Impact", "Risk_Impact")]
-    snps_input = {snp: random.choice(["AA", "AG", "GG"]) for snp in all_snps}
-    results, status = analyze_snps(snps_input)
-    st.session_state["pgx_results_list"] = results # Save to session state
-    st.session_state["pgx_status"] = status
-    st.session_state["_simulate_snps"] = False
-    st.rerun() 
-
-# Retrieve current results from session state
-results = st.session_state.get('pgx_results_list', [])
-status = st.session_state.get('pgx_status', {})
-
-
-# ----------------------------
-# --- Top Metric Cards ---
-# ----------------------------
-total, critical_pct, avg_hr, avg_bp = metrics_from_results(status)
-
-mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-mcol1.markdown(f"<div class='card'><div class='muted'>Total Patients</div><div class='small-metric'>{total}</div></div>", unsafe_allow_html=True)
-mcol2.markdown(f"<div class='card' style='border-left: 5px solid {EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#EEEEEE'};'><div class='muted'>Critical PGx Flag</div><div class='small-metric' style='color:{EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#4CAF50'}'>{critical_pct}%</div></div>", unsafe_allow_html=True)
-mcol3.markdown(f"<div class='card'><div class='muted'>Avg Heart Rate (Pop)</div><div class='small-metric'>{avg_hr} bpm</div></div>", unsafe_allow_html=True)
-mcol4.markdown(f"<div class='card'><div class='muted'>Avg Blood Pressure (Pop)</div><div class='small-metric'>{avg_bp}</div></div>", unsafe_allow_html=True)
-
-st.markdown("")
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1.markdown(f"<div class='card'><div class='muted'>Total Patients</div><div class='small-metric'>{total}</div></div>", unsafe_allow_html=True)
+    mcol2.markdown(f"<div class='card' style='border-left: 5px solid {EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#EEEEEE'};'><div class='muted'>Critical PGx Flag</div><div class='small-metric' style='color:{EMERGENCY_STATUS_COLORS['Critical'] if critical_pct > 0 else '#4CAF50'}'>{critical_pct}%</div></div>", unsafe_allow_html=True)
+    mcol3.markdown(f"<div class='card'><div class='muted'>Avg Heart Rate (Pop)</div><div class='small-metric'>{avg_hr} bpm</div></div>", unsafe_allow_html=True)
+    mcol4.markdown(f"<div class='card'><div class='muted'>Avg Blood Pressure (Pop)</div><div class='small-metric'>{avg_bp}</div></div>", unsafe_allow_html=True)
+    
+    st.markdown("")
+else:
+    # Display a clear spacer if no data is present and we're in a non-demographics mode
+    st.markdown("<br/>", unsafe_allow_html=True)
+    
 
 # ----------------------------
 # --- Main two-column layout ---
@@ -554,6 +546,7 @@ with left_col:
                 st.success("Simulated VCF parsed.")
                 st.rerun()
         with colB:
+            # FIX: Ensure processing happens here and triggers rerun
             if uploaded_file:
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
@@ -679,7 +672,6 @@ with right_col:
     st.markdown(card_html, unsafe_allow_html=True)
     
     # Handle the functional buttons outside the raw HTML block
-    # These buttons must have different keys than the HTML buttons above
     if st.button("Generate Comprehensive Report", key='comp_report_btn'):
         report_content = generate_comprehensive_report(patient_name, results, status)
         st.download_button(
@@ -690,7 +682,7 @@ with right_col:
         )
         st.success("Comprehensive Report ready for download!")
 
-    if st.button("Reset & New Run", key='reset_btn_action'): # Changed key to avoid conflict
+    if st.button("Reset & New Run", key='reset_btn_action'): 
         reset_dashboard()
 
     st.markdown("---")
