@@ -211,6 +211,7 @@ def _inject_css(light=True):
       .med-card-content { color: #333333 !important; }
       
       /* FIX: Reduce font size for Treemap title and labels */
+      /* Increased uniformtext_minsize to make labels readable */
       .modebar { margin-top: -30px !important; }
     </style>
     """
@@ -556,7 +557,6 @@ with left_col:
                 results, status = analyze_snps(snps_input)
                 st.session_state["pgx_results_list"] = results 
                 st.session_state["pgx_status"] = status
-                # FIX: Removed success message that caused slow double-rerun
                 st.info("VCF processing complete. Displaying results.") 
                 st.rerun()
     
@@ -600,7 +600,7 @@ with left_col:
             fig2.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=1)))
             fig2.update_layout(paper_bgcolor="#FFFFFF", title_font_size=14)
             # FIX: Reduced height for Pie Chart
-            st.plotly_chart(fig2, use_container_width=True, height=300) 
+            st.plotly_chart(fig2, use_container_width=True, height=280) 
             st.caption("Interpretation: A critical view on the most significant effects (Poor/High Risk) influencing drug metabolism and disease risk for this patient.")
             
         # Treemap
