@@ -1,3 +1,9 @@
+# app.py (TeleGeno AI Dashboard) -- modified only for:
+# 1) stable VCF upload handling (no infinite reruns / glitching)
+# 2) compact, aesthetic Plotly charts (reduced size & improved layout)
+#
+# Rest of your original code remains intact.
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -184,27 +190,6 @@ def generate_comprehensive_report(patient_name, results_list, status):
     report += "\n--------------------------------------------------------\n"
     return report
 
-# CALLBACK function for VCF upload to handle file object and store data reliably
-def handle_vcf_upload():
-    uploaded_file = st.session_state.get('vcf_uploader_key')
-    if uploaded_file is not None:
-        try:
-            content = uploaded_file.getvalue().decode(errors="ignore")
-            snps_input = parse_vcf_simulator(content)
-            results, status = analyze_snps(snps_input)
-            
-            # Store results reliably in session state
-            st.session_state["pgx_results_list"] = results 
-            st.session_state["pgx_status"] = status
-            st.session_state["vcf_processed_message"] = "Uploaded VCF data analyzed successfully."
-        except Exception as e:
-            st.session_state["vcf_processed_message"] = f"Error processing VCF: {e}"
-        st.rerun()
-    else:
-        # Clear message if file is cleared
-        st.session_state["vcf_processed_message"] = ""
-
-
 # ----------------------------
 # --- Page & Theme Setup ---
 # ----------------------------
@@ -381,7 +366,7 @@ if emergency_tab:
                                 f"<p style='margin: 0; font-size: 12px;'>Automated Triage</p>"
                                 f"</div>", unsafe_allow_html=True)
 
-            # --- Actionable Advice ---
+            # --- Actionable Advice --- (unchanged)
             st.markdown("### Step 3: Next Steps & Advice")
             
             if status_overall == "Critical":
@@ -556,23 +541,43 @@ with left_col:
                 st.success("Simulated VCF parsed.")
                 st.rerun()
         with colB:
-            # FIX VCF RELOAD STABILITY: Use callback to process uploaded file immediately
+            # ===============================
+            # STABILITY FIX: process uploaded_file once per unique file
+            # ===============================
             if uploaded_file:
-                # Process the file content
-                content = uploaded_file.getvalue().decode(errors="ignore")
-                snps_input = parse_vcf_simulator(content)
-                results, status = analyze_snps(snps_input)
-                
-                # Store results reliably in session state
-                st.session_state["pgx_results_list"] = results 
-                st.session_state["pgx_status"] = status
-                
-                # FIX: Use st.info for processing feedback
-                st.info("VCF processing complete. Displaying results.") 
-                
-                # Rerun to display the stored results
-                st.rerun()
-    
+                # create a stable key for the uploaded file content (name + size + hash)
+                try:
+                    raw = uploaded_file.getvalue()
+                    content_hash = str(abs(hash(raw)) % (10**12))
+                    file_key = f"{getattr(uploaded_file,'name', '')}_{len(raw)}_{content_hash}"
+                except Exception:
+                    file_key = getattr(uploaded_file, "name", str(time.time()))
+                prev_key = st.session_state.get("last_vcf_key", None)
+
+                if prev_key != file_key:
+                    # show spinner while processing
+                    with st.spinner("Processing VCF — please wait..."):
+                        try:
+                            content = raw.decode(errors="ignore") if isinstance(raw, (bytes, bytearray)) else str(raw)
+                            snps_input = parse_vcf_simulator(content)
+                            results, status = analyze_snps(snps_input)
+                            # store in session_state (stable)
+                            st.session_state["pgx_results_list"] = results
+                            st.session_state["pgx_status"] = status
+                            st.session_state["last_vcf_key"] = file_key
+                            st.session_state["vcf_processed_message"] = "VCF processing complete. Displaying results."
+                            st.success("VCF processing complete. Displaying results.")
+                        except Exception as e:
+                            st.session_state["vcf_processed_message"] = f"Error processing VCF: {e}"
+                            st.error(f"Error processing VCF: {e}")
+                else:
+                    # already processed this file
+                    st.info("This VCF file has already been processed — results are shown below.")
+            else:
+                # no file uploaded - clear any previous message if needed
+                if st.session_state.get("vcf_processed_message"):
+                    st.session_state["vcf_processed_message"] = ""
+
     # Display message if no input is selected in the sidebar
     else:
         st.info("Select an input source from the sidebar to begin PGx analysis.")
@@ -599,9 +604,11 @@ with left_col:
             gen_counts.columns = ["Genotype", "Count"]
             fig1 = px.bar(gen_counts, x="Genotype", y="Count", title="Count of Observed Genotypes", template=plot_template, 
                           color_discrete_sequence=["#2979FF"]) # Blue
-            fig1.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", title_font_size=14)
-            st.plotly_chart(fig1, use_container_width=True, height=280) # Reduced Height
-            st.caption("Interpretation: Visualizing the frequency of homozygous (e.g., AA) vs. heterozygous (e.g., AG) genotypes. The genotype determines the resulting effect.")
+            # compact layout
+            fig1.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", title_font_size=13, margin=dict(t=30,l=10,r=10,b=10))
+            fig1.update_traces(marker_line_width=0)
+            st.plotly_chart(fig1, use_container_width=True, height=260, config={"displayModeBar": False})
+            st.caption("Interpretation: visual frequency of homozygous vs heterozygous genotypes.")
             
         with c2:
             # Effect Pie Chart
@@ -611,19 +618,18 @@ with left_col:
                           color="Effect",
                           color_discrete_map=STATUS_COLORS, template=plot_template)
             fig2.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=1)))
-            fig2.update_layout(paper_bgcolor="#FFFFFF", title_font_size=14)
-            # FIX: Reduced height for Pie Chart
-            st.plotly_chart(fig2, use_container_width=True, height=280) 
-            st.caption("Interpretation: A critical view on the most significant effects (Poor/High Risk) influencing drug metabolism and disease risk for this patient.")
+            fig2.update_layout(paper_bgcolor="#FFFFFF", title_font_size=13, margin=dict(t=30,l=10,r=10,b=10))
+            st.plotly_chart(fig2, use_container_width=True, height=260, config={"displayModeBar": False})
+            st.caption("Interpretation: breakdown of the predicted effects for this patient.")
             
-        # Treemap
+        # Treemap (reduced & only when meaningful)
         treemap_df = df.groupby(["Gene","Effect"]).size().reset_index(name="count")
-        fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
-                          template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
-        # FIX: Aggressively reduced height for better flow and aesthetics
-        fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10), title_font_size=14, uniformtext_minsize=10, uniformtext_mode='hide') 
-        st.plotly_chart(fig3, use_container_width=True, height=200) # Minimum height for readability
-        st.caption("Interpretation: Shows which genes (CYP2C19/APOE) are associated with the most concerning effects. Larger blocks indicate more SNPs contributing to that specific effect.")
+        if not treemap_df.empty and treemap_df["count"].sum() > 0:
+            fig3 = px.treemap(treemap_df, path=[px.Constant("All Genes"), "Gene","Effect"], values="count", title="Hierarchical View: Gene → Effect", 
+                              template=plot_template, color="Effect", color_discrete_map=STATUS_COLORS)
+            fig3.update_layout(paper_bgcolor="#FFFFFF", margin=dict(t=30, l=10, r=10, b=10), title_font_size=13)
+            st.plotly_chart(fig3, use_container_width=True, height=180, config={"displayModeBar": False})
+            st.caption("Interpretation: gene-level view of variant effects.")
         
         st.markdown("---")
         # Medication recommendations
