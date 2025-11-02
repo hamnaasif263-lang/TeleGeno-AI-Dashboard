@@ -533,7 +533,7 @@ with left_col:
                 st.rerun()
         with colB:
             if uploaded_file:
-                # FIX: Ensures VCF processing happens and displays results
+                # FIX: VCF processing now triggers the full data flow for display
                 content = uploaded_file.getvalue().decode(errors="ignore")
                 snps_input = parse_vcf_simulator(content)
                 results, status = analyze_snps(snps_input)
