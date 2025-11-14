@@ -1,6 +1,5 @@
 matplotlib
 seaborn
-ploty
 dash
 flask
 streamlit==1.24.0
